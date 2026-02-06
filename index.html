@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlasticScan – Dispersión de Partículas</title>
+
+<style>
+body{
+  margin:0;
+  font-family: Arial, sans-serif;
+  background:#f4f6f5;
+  color:#222;
+}
+
+/* PORTAL */
+#portal{
+  position:fixed;
+  inset:0;
+  background:linear-gradient(135deg,#1b5e20,#66bb6a);
+  color:white;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  z-index:10;
+}
+#portal button{
+  margin-top:20px;
+  padding:12px 30px;
+  border:none;
+  border-radius:30px;
+  background:white;
+  color:#1b5e20;
+  font-size:1rem;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+/* CONTENIDO */
+main{
+  max-width:900px;
+  margin:auto;
+  padding:20px;
+}
+
+section{
+  background:white;
+  padding:20px;
+  margin-bottom:20px;
+  border-radius:8px;
+  box-shadow:0 2px 5px rgba(0,0,0,.08);
+}
+
+h1,h2{
+  color:#1b5e20;
+}
+
+label{
+  font-weight:bold;
+}
+
+select,input{
+  width:100%;
+  padding:8px;
+  margin-top:5px;
+  margin-bottom:15px;
+}
+
+/* RESULTADO */
+#resultado{
+  font-size:1.1rem;
+  background:#e8f5e9;
+  padding:15px;
+  border-radius:6px;
+  margin-top:15px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- PORTAL -->
+<div id="portal">
+  <h1>🌱 PlasticScan</h1>
+  <p>Simulador educativo de dispersión de partículas en plásticos</p>
+  <button onclick="entrar()">Entrar</button>
+</div>
+
+<main>
+
+<section>
+<h2>📘 Fundamento físico</h2>
+<p>
+Este simulador utiliza la <strong>fórmula de Highland</strong> para calcular
+la dispersión múltiple de Coulomb de partículas cargadas al atravesar
+materiales plásticos, permitiendo estudiar el impacto de contaminantes
+como el PVC en procesos de reciclado.
+</p>
+</section>
+
+<section>
+<h2>⚙️ Simulador interactivo</h2>
+
+<label>Partícula</label>
+<select id="particula">
+  <option value="electron">Electrón</option>
+  <option value="muon">Muón</option>
+  <option value="proton">Protón</option>
+</select>
+
+<label>Momento (GeV/c)</label>
+<input type="number" id="momento" value="3" step="0.1">
+
+<label>Espesor del material (mm)</label>
+<input type="number" id="espesor" value="2" step="0.1">
+
+<label>Material base</label>
+<select id="material">
+  <option value="HDPE">HDPE</option>
+  <option value="PP">PP</option>
+  <option value="PET">PET</option>
+</select>
+
+<label>Contaminación con PVC (%)</label>
+<input type="number" id="contaminacion" value="0" min="0" max="20">
+
+<button onclick="simular()">Calcular dispersión</button>
+
+<div id="resultado"></div>
+</section>
+
+</main>
+
+<script>
+// ================== DATOS ==================
+
+const MATERIALES = {
+  HDPE:{nombre:'HDPE',X0:47.5,density:0.94,Z_eff:3.5},
+  PP:{nombre:'PP',X0:49.7,density:0.90,Z_eff:3.4},
+  PET:{nombre:'PET',X0:28.5,density:1.38,Z_eff:4.5},
+  PVC:{nombre:'PVC',X0:15.8,density:1.40,Z_eff:9.0}
+};
+
+const PARTICULAS = {
+  electron:{nombre:'Electrón',masa:0.511},
+  muon:{nombre:'Muón',masa:105.7},
+  proton:{nombre:'Protón',masa:938.3}
+};
+
+// ================== FUNCIONES ==================
+
+function calcularDispersion(momento,espesor,material,particula){
+  const p = momento*1000;
+  const x = espesor/10;
+  const E = Math.sqrt(p*p + particula.masa*particula.masa);
+  const beta = p/E;
+  const xX0 = x/material.X0;
+
+  const theta = (13.6/(p*beta)) *
+                Math.sqrt(xX0) *
+                (1+0.038*Math.log(xX0));
+
+  return theta*1000;
+}
+
+function mezclarMaterial(base,contaminante,porcentaje){
+  const f = porcentaje/100;
+  return {
+    nombre:base.nombre+" + PVC",
+    X0:1/(f/contaminante.X0+(1-f)/base.X0),
+    density:f*contaminante.density+(1-f)*base.density,
+    Z_eff:f*contaminante.Z_eff+(1-f)*base.Z_eff
+  };
+}
+
+function simular(){
+  const p = parseFloat(document.getElementById("momento").value);
+  const e = parseFloat(document.getElementById("espesor").value);
+  const mat = MATERIALES[document.getElementById("material").value];
+  const part = PARTICULAS[document.getElementById("particula").value];
+  const c = parseFloat(document.getElementById("contaminacion").value);
+
+  const thetaVirgen = calcularDispersion(p,e,mat,part);
+
+  let texto = `Material virgen: <strong>${thetaVirgen.toFixed(2)} mrad</strong><br>`;
+
+  if(c>0){
+    const mezcla = mezclarMaterial(mat,MATERIALES.PVC,c);
+    const thetaCont = calcularDispersion(p,e,mezcla,part);
+    const diff = ((thetaCont-thetaVirgen)/thetaVirgen)*100;
+
+    texto += `Material contaminado: <strong>${thetaCont.toFixed(2)} mrad</strong><br>`;
+    texto += `Incremento: <strong>+${diff.toFixed(0)}%</strong>`;
+  }
+
+  document.getElementById("resultado").innerHTML = texto;
+}
+
+function entrar(){
+  document.getElementById("portal").style.display="none";
+}
+</script>
+
+</body>
+</html>
